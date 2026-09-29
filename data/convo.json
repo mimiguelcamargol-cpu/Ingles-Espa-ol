@@ -1,0 +1,38 @@
+[
+{"id":"d1","track":"dev","level":1,"title":"What do you do? · Tu trabajo","turns":[
+ {"t":"Hi! What do you do for a living?","es":"¡Hola! ¿A qué te dedicas?"},
+ {"y":[["I'm learning to be a software developer.",1,"Estoy aprendiendo a ser desarrollador."],["I am software the developer learn.",0,"(incorrecto)"],["I learn developer of software.",0,"(incorrecto)"]]},
+ {"t":"That's great! Which programming language are you learning?","es":"¡Genial! ¿Qué lenguaje de programación aprendes?"},
+ {"y":[["I'm starting with Python because it's easy to read.",1,"Empiezo con Python porque es fácil de leer."],["I starting Python because easy.",0,"(incorrecto)"],["Python is starting me.",0,"(incorrecto)"]]},
+ {"t":"Good choice. What have you built so far?","es":"Buena elección. ¿Qué has construido hasta ahora?"},
+ {"y":[["I've written a small program that saves my expenses.",1,"He escrito un programa pequeño que guarda mis gastos."],["I wrote program for expenses saving.",0,"(incorrecto)"],["I have write expenses.",0,"(incorrecto)"]]}
+]},
+{"id":"d2","track":"dev","level":2,"title":"Front end vs back end","turns":[
+ {"t":"Can you explain the difference between front end and back end?","es":"¿Puedes explicar la diferencia entre front end y back end?"},
+ {"y":[["The front end is what users see, and the back end handles data and logic.",1,"El front end es lo que ve el usuario y el back end maneja datos y lógica."],["Front end is the back of the end.",0,"(incorrecto)"],["The back end see the users.",0,"(incorrecto)"]]},
+ {"t":"Right. Where is the data stored?","es":"Correcto. ¿Dónde se guardan los datos?"},
+ {"y":[["It is stored in a database, and the server sends it through an API.",1,"Se guarda en una base de datos y el servidor lo envía por una API."],["It stores in database and API sends.",0,"(incorrecto)"],["The database is stored the API.",0,"(incorrecto)"]]}
+]},
+{"id":"d3","track":"dev","level":3,"title":"Fixing a bug","turns":[
+ {"t":"The login page crashes on mobile. Have you found the cause?","es":"La página de login falla en móvil. ¿Has encontrado la causa?"},
+ {"y":[["Not yet, but I think it's related to how we handle empty input.",1,"Aún no, pero creo que tiene que ver con cómo manejamos entradas vacías."],["No yet, but I think it relate empty.",0,"(incorrecto)"],["I found it before to yesterday.",0,"(incorrecto)"]]},
+ {"t":"How would you reproduce it?","es":"¿Cómo lo reproducirías?"},
+ {"y":[["I would write a failing test first, then fix the code until it passes.",1,"Escribiría primero una prueba que falle y luego arreglaría el código hasta que pase."],["I will to write test after fail.",0,"(incorrecto)"],["I would wrote a test failing.",0,"(incorrecto)"]]}
+]},
+{"id":"d4","track":"dev","level":4,"title":"Code review & trade-offs","turns":[
+ {"t":"Why did you choose a monolith instead of microservices?","es":"¿Por qué elegiste un monolito en vez de microservicios?"},
+ {"y":[["For a small team, a monolith is simpler to deploy and debug; we can split it later if we need to.",1,"Para un equipo pequeño, un monolito es más simple de desplegar y depurar; podemos dividirlo después."],["Because microservices are bad and monolith good.",0,"(demasiado simplista)"],["We had chosen monolith because simple.",0,"(incorrecto)"]]},
+ {"t":"Fair. If traffic grows tenfold, what would break first?","es":"Justo. Si el tráfico se multiplica por diez, ¿qué fallaría primero?"},
+ {"y":[["Probably the database, so I would add caching and read replicas before scaling the app servers.",1,"Probablemente la base de datos; añadiría caché y réplicas de lectura antes de escalar los servidores."],["The database will breaks first.",0,"(incorrecto)"],["I would to add many servers.",0,"(incorrecto)"]]}
+]},
+{"id":"c1","track":"daily","level":1,"title":"At a café · En una cafetería","turns":[
+ {"t":"Good morning! What can I get you?","es":"¡Buenos días! ¿Qué le sirvo?"},
+ {"y":[["I'd like a coffee with milk, please.",1,"Quisiera un café con leche, por favor."],["I want coffee milk you give.",0,"(incorrecto)"],["Me coffee, please.",0,"(incorrecto)"]]},
+ {"t":"Would you like anything to eat?","es":"¿Desea algo para comer?"},
+ {"y":[["Yes, could I have a sandwich too?",1,"Sí, ¿podría darme también un sándwich?"],["Yes, I have a sandwich?",0,"(incorrecto)"],["Sandwich is me want.",0,"(incorrecto)"]]}
+]},
+{"id":"c2","track":"daily","level":2,"title":"Job interview · Entrevista","turns":[
+ {"t":"Tell me about a challenge you have overcome.","es":"Cuéntame sobre un desafío que hayas superado."},
+ {"y":[["Last year I had to learn a new tool quickly, so I practised every day until I felt confident.",1,"El año pasado tuve que aprender una herramienta rápido y practiqué a diario."],["I have overcome challenge yesterday.",0,"(incorrecto)"],["Challenge was very challenge.",0,"(incorrecto)"]]}
+]}
+]

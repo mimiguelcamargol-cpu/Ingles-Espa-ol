@@ -1,0 +1,27 @@
+:root{--bg:#0f172a;--card:#1e293b;--txt:#e2e8f0;--mute:#94a3b8;--acc:#38bdf8;--ok:#22c55e;--bad:#ef4444;--r:14px}
+@media(prefers-color-scheme:light){:root{--bg:#f1f5f9;--card:#fff;--txt:#0f172a;--mute:#64748b;--acc:#0369a1}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:72px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;position:sticky;top:0;background:var(--bg);z-index:5}
+main{max-width:760px;margin:0 auto;padding:0 16px 24px;outline:none}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid #0002;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav a{flex:1;text-align:center;text-decoration:none;color:var(--mute);padding:6px 0;font-size:18px}
+nav a small{display:block;font-size:10px}nav a.on{color:var(--acc)}
+h1,h2,h3{margin:.6em 0 .3em}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin:12px 0}
+.pill{background:var(--card);color:var(--acc);border-radius:99px;padding:2px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--acc);color:#04202e;border:0;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
+button.alt{background:transparent;color:var(--txt);border:1px solid var(--mute)}
+button.opt{display:block;width:100%;text-align:left;margin:6px 0;background:#0002;color:var(--txt);border:1px solid #0003}
+button.ok{background:var(--ok)!important;color:#fff!important}button.bad{background:var(--bad)!important;color:#fff!important}
+input[type=text],input[type=url],input[type=password],select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--mute);background:transparent}
+.big{font-size:28px;font-weight:700}.mute{color:var(--mute)}.es{color:var(--mute);font-size:14px}
+.bar{height:8px;background:#0003;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+.bubble{padding:10px 14px;border-radius:16px;margin:8px 0;max-width:88%}
+.tutor{background:var(--card)}.you{background:var(--acc);color:#04202e;margin-left:auto}
+.lock{position:fixed;inset:0;background:var(--bg);z-index:10;display:flex;align-items:center;justify-content:center;padding:24px}
+.lock>div{width:100%;max-width:320px;text-align:center}
+.locked{opacity:.45}
+audio{width:100%}
