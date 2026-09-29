@@ -9,11 +9,21 @@ PWA sin backend ni IA en tiempo de uso: **0 tokens**. Voz con las APIs del naveg
 - **Audios largos**: añade mp3 o RSS de podcasts; guarda posición, velocidad y notas.
 - **Privacidad**: PIN local, `noindex`, datos solo en tu navegador, exportar/importar backup.
 
-## Usar
+## Arquitectura (online + offline, solo para ti)
+- **Frontend**: PWA offline-first. Todo funciona sin red; el progreso se guarda en el dispositivo y se sincroniza al volver la conexión (punto ● en la cabecera).
+- **Backend** (`server/server.js`, Node ≥18, sin dependencias): sesión por contraseña única (cookie HttpOnly), sincronización `GET/PUT /api/state`, lector de RSS de podcasts con protección SSRF, copias diarias (7) y cabeceras de seguridad. Nada de la app se sirve sin sesión.
+- **Fusión sin pérdidas** (`merge.js`, compartido): por palabra gana el repaso más reciente; puntajes = máximo; audios y exámenes = unión. Puedes usar teléfono y PC a la vez.
+- **0 tokens**: no hay llamadas a IA en ningún punto.
+
+## Ejecutar
 ```
-python3 -m http.server 8000   # abre http://localhost:8000 ; en el móvil: "Añadir a pantalla de inicio"
+APP_PASSWORD='tu-clave-larga' npm start        # http://localhost:8080
+npm test                                        # 7 pruebas (auth, sync, CSRF, SSRF, fusión)
 ```
-Para usarla en el teléfono, aloja los archivos en un sitio **privado** (p. ej. Cloudflare Pages con Access, Netlify con contraseña, o tu red local). No la publiques en un GitHub Pages público.
+Variables: `APP_PASSWORD` (obligatoria, ≥8), `PORT`, `DATA_DIR` (por defecto `./storage`, ignorado por git), `COOKIE_SECURE=1` detrás de HTTPS.
+
+**Despliegue en línea** (para el teléfono): cualquier VPS o servicio con Docker (`docker build -t mi-ingles . && docker run -p 8080:8080 -v ingles:/data -e APP_PASSWORD=... mi-ingles`) detrás de HTTPS (Caddy/Cloudflare Tunnel). En el móvil: abrir la URL → "Añadir a pantalla de inicio". Los datos viven en el volumen `/data`.
+También funciona solo local con `python3 -m http.server` (sin sincronización ni login).
 
 ## Llegar a 9000 palabras
 `data/vocab.json` trae una semilla (~100). Prepara un CSV `en,es,pos,level,example` y ejecuta:

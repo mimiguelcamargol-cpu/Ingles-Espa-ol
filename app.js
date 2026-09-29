@@ -9,10 +9,11 @@ const BOX_DAYS = [0, 1, 2, 4, 8, 16, 32];
 
 /* ---------- estado ---------- */
 const KEY = 'ie.state.v1';
-const defaults = () => ({ pin: null, rate: 0.9, unlockAll: false, srs: {}, gram: {}, convo: {}, devLevel: 1, exams: [], pods: [], stats: { days: {} } });
+const defaults = () => ({ pin: null, rate: 0.9, unlockAll: false, srs: {}, gram: {}, convo: {}, devLevel: 1, exams: [], pods: [], stats: { days: {} }, settingsAt: 0 });
 let S;
 try { S = { ...defaults(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { S = defaults(); }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { } };
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { } };
+const save = () => { persist(); scheduleSync(); };
 const today = () => new Date().toISOString().slice(0, 10);
 const tick = (n = 1) => { S.stats.days[today()] = (S.stats.days[today()] || 0) + n; save(); };
 const streak = () => { let n = 0, d = new Date(); while (S.stats.days[d.toISOString().slice(0, 10)]) { n++; d = new Date(d - DAY); } return n; };
@@ -24,7 +25,11 @@ async function init() {
   [VOCAB, GRAM, CONVO, LEVELS] = await Promise.all([load('vocab'), load('grammar'), load('convo'), load('levels')]);
   VOCAB = VOCAB.map(([en, es, pos, lv, ex]) => ({ id: en + '|' + pos, en, es, pos, lv, ex }));
   addEventListener('hashchange', route);
+  addEventListener('online', () => sync());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+  document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) location.hash = g.dataset.go; });
   route();
+  sync().then(() => { if (/^#?(home|vocab|grammar|talk|exam|pods|settings)?$/.test(location.hash.slice(0) || '#home')) route(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 
@@ -59,11 +64,11 @@ function levelUnlocked(i) {
   return !ws.length || ws.filter(w => box(w) >= 2).length / ws.length >= 0.7;
 }
 const unlockedWords = () => VOCAB.filter(w => levelUnlocked(lvlIdx(w.lv)));
-const currentLevel = () => { let c = 0; LEVELS.forEach((_, i) => { if (levelUnlocked(i)) c = i; }); return LEVELS[c]; };
+const currentLevel = () => { let c = 0; LEVELS.forEach((l, i) => { if (levelUnlocked(i) && wordsOf(l.id).length) c = i; }); return LEVELS[c]; };
 function grade(w, ok) {
   const s = S.srs[w.id] || { b: 0 };
   s.b = ok ? Math.min(6, s.b + 1) : Math.max(0, s.b - 2);
-  s.due = Date.now() + BOX_DAYS[s.b] * DAY; S.srs[w.id] = s; tick();
+  s.due = Date.now() + BOX_DAYS[s.b] * DAY; s.t = Date.now(); S.srs[w.id] = s; tick();
 }
 function queue(n = 10) {
   const pool = unlockedWords(), now = Date.now();
@@ -74,6 +79,23 @@ function queue(n = 10) {
 function distractors(w, key, n = 3) {
   const seen = new Set([w[key]]);
   return shuffle(VOCAB).filter(x => !seen.has(x[key]) && seen.add(x[key])).slice(0, n);
+}
+
+/* ---------- sincronización (offline-first) ---------- */
+let syncStatus = 'none', serverUp = false, syncTimer = null, syncing = false;
+const setSync = st => { syncStatus = st; const d = $('#sy'); if (d) { d.textContent = { ok: '●', off: '○', auth: '🔒', none: '', busy: '…' }[st]; d.title = { ok: 'Sincronizado', off: 'Sin conexión: se guarda local', auth: 'Inicia sesión para sincronizar', none: '', busy: 'Sincronizando' }[st]; } };
+function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(() => sync(), 3000); }
+async function sync(manual) {
+  if (syncing) return; syncing = true; setSync('busy');
+  try {
+    const { pin, ...body } = S;
+    const r = await fetch('/api/state', { method: 'PUT', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ state: body }), redirect: 'error' });
+    if (r.status === 401) { serverUp = true; setSync('auth'); if (manual) location.href = '/login.html'; return; }
+    if (!r.ok) throw 0;
+    const j = await r.json(); serverUp = true;
+    S = { ...defaults(), ...IEMerge.merge(S, j.state), pin: S.pin }; persist(); setSync('ok');
+  } catch { serverUp = false; setSync(navigator.onLine ? 'none' : 'off'); }
+  finally { syncing = false; }
 }
 
 /* ---------- vista base ---------- */
@@ -97,9 +119,9 @@ VIEWS.home = () => {
    <div class="bar"><i style="width:${Math.min(100, learned / 9000 * 100 * 10)}%"></i></div>
    <p class="mute">${learned} dominadas · ${total} cargadas · meta 9000 · ${due} para repasar hoy</p></div>
   <div class="card"><h3>Hoy</h3><div class="row">
-   <button onclick="location.hash='#vocab/mixed'">Estudiar vocabulario</button>
-   <button class="alt" onclick="location.hash='#talk'">Conversar</button>
-   <button class="alt" onclick="location.hash='#exam'">Examen</button></div></div>
+   <button data-go="#vocab/mixed">Estudiar vocabulario</button>
+   <button class="alt" data-go="#talk">Conversar</button>
+   <button class="alt" data-go="#exam">Examen</button></div></div>
   ${total < 9000 ? `<div class="card mute">Tienes ${total} de 9000 palabras cargadas. Añade más con <code>tools/import_vocab.py</code> (ver README).</div>` : ''}`);
 };
 
@@ -111,10 +133,10 @@ VIEWS.vocab = (mode) => {
       return `<div class="card ${un ? '' : 'locked'}"><b>${esc(l.name)} ${un ? '' : '🔒'}</b> <span class="mute">(${ok}/${ws.length})</span><div class="bar"><i style="width:${ws.length ? ok / ws.length * 100 : 0}%"></i></div></div>`;
     }).join('');
     return view(`<h2>Vocabulario</h2><div class="row">
-      <button onclick="location.hash='#vocab/mixed'">Mixto</button>
-      <button class="alt" onclick="location.hash='#vocab/flash'">Tarjetas</button>
-      <button class="alt" onclick="location.hash='#vocab/spell'">Spelling</button>
-      <button class="alt" onclick="location.hash='#vocab/listen'">Listening</button></div>${rows}`);
+      <button data-go="#vocab/mixed">Mixto</button>
+      <button class="alt" data-go="#vocab/flash">Tarjetas</button>
+      <button class="alt" data-go="#vocab/spell">Spelling</button>
+      <button class="alt" data-go="#vocab/listen">Listening</button></div>${rows}`);
   }
   runDrill(queue(10), mode, 'vocab');
 };
@@ -124,7 +146,7 @@ function runDrill(items, mode, back, onDone) {
   const modes = ['flash', 'listen', 'spell'];
   const next = () => {
     if (i >= items.length) {
-      const res = `<h2>Sesión completa</h2><div class="card"><p class="big">${right}/${items.length}</p></div><button onclick="location.hash='#${back}'">Volver</button>`;
+      const res = `<h2>Sesión completa</h2><div class="card"><p class="big">${right}/${items.length}</p></div><button data-go="#${back}">Volver</button>`;
       if (onDone) return onDone(right, items.length, res);
       return view(res);
     }
@@ -156,12 +178,12 @@ function runDrill(items, mode, back, onDone) {
 VIEWS.grammar = (id) => {
   const g = GRAM.find(x => x.id === id);
   if (!g) {
-    return view(`<h2>Gramática</h2>${GRAM.map(x => `<div class="card ${levelUnlocked(lvlIdx(x.level)) ? '' : 'locked'}"><b>${esc(x.title)}</b> <span class="pill">${esc(x.level)}</span> ${S.gram[x.id] != null ? '✅ ' + S.gram[x.id] + '%' : ''}<div><button onclick="location.hash='#grammar/${x.id}'">Abrir</button></div></div>`).join('')}`);
+    return view(`<h2>Gramática</h2>${GRAM.map(x => `<div class="card ${levelUnlocked(lvlIdx(x.level)) ? '' : 'locked'}"><b>${esc(x.title)}</b> <span class="pill">${esc(x.level)}</span> ${S.gram[x.id] != null ? '✅ ' + S.gram[x.id] + '%' : ''}<div><button data-go="#grammar/${x.id}">Abrir</button></div></div>`).join('')}`);
   }
   let i = 0, ok = 0;
   const ex = g.exercises;
   const show = () => {
-    if (i >= ex.length) { const p = Math.round(ok / ex.length * 100); S.gram[g.id] = Math.max(S.gram[g.id] || 0, p); tick(2); save(); return view(`<h2>${p}%</h2><button onclick="location.hash='#grammar'">Volver</button>`); }
+    if (i >= ex.length) { const p = Math.round(ok / ex.length * 100); S.gram[g.id] = Math.max(S.gram[g.id] || 0, p); tick(2); save(); return view(`<h2>${p}%</h2><button data-go="#grammar">Volver</button>`); }
     const q = ex[i];
     view(`<h3>${esc(g.title)}</h3><p class="mute">Pregunta ${i + 1}/${ex.length}</p><div class="card"><p class="big" style="font-size:20px">${esc(q.q)}</p>${q.o.map((o, k) => `<button class="opt" data-k="${k}">${esc(o)}</button>`).join('')}</div>`);
     document.querySelectorAll('.opt').forEach(b => b.onclick = () => { const c = +b.dataset.k === q.a; b.classList.add(c ? 'ok' : 'bad'); if (c) ok++; document.querySelectorAll('.opt').forEach(x => x.disabled = true); i++; setTimeout(show, 800); });
@@ -176,7 +198,7 @@ VIEWS.talk = (id) => {
   const c = CONVO.find(x => x.id === id);
   if (!c) {
     const dev = CONVO.filter(x => x.track === 'dev'), daily = CONVO.filter(x => x.track === 'daily');
-    const item = x => { const lock = x.track === 'dev' && x.level > S.devLevel; const sc = S.convo[x.id]; return `<div class="card ${lock ? 'locked' : ''}"><b>${esc(x.title)}</b> <span class="pill">nivel ${x.level}</span> ${sc != null ? '✅ ' + sc + '%' : ''} ${lock ? '🔒' : `<div><button onclick="location.hash='#talk/${x.id}'">Empezar</button></div>`}</div>`; };
+    const item = x => { const lock = x.track === 'dev' && x.level > S.devLevel; const sc = S.convo[x.id]; return `<div class="card ${lock ? 'locked' : ''}"><b>${esc(x.title)}</b> <span class="pill">nivel ${x.level}</span> ${sc != null ? '✅ ' + sc + '%' : ''} ${lock ? '🔒' : `<div><button data-go="#talk/${x.id}">Empezar</button></div>`}</div>`; };
     return view(`<h2>Conversación</h2><h3>💻 Desarrollo de software <span class="pill">tu nivel: ${S.devLevel}</span></h3><p class="es">La dificultad sube conforme completas cada nivel con ≥80%.</p>${dev.map(item).join('')}<h3>☕ Vida diaria</h3>${daily.map(item).join('')}`);
   }
   let i = 0, right = 0, total = c.turns.filter(t => t.y).length;
@@ -200,7 +222,7 @@ VIEWS.talk = (id) => {
       if (all.every(x => (S.convo[x.id] || 0) >= 80) && CONVO.some(x => x.track === 'dev' && x.level > S.devLevel)) S.devLevel++;
     }
     save();
-    view(`<h2>${p}%</h2>${log.join('')}<button onclick="location.hash='#talk'">Volver</button>`);
+    view(`<h2>${p}%</h2>${log.join('')}<button data-go="#talk">Volver</button>`);
   };
   step();
 };
@@ -209,13 +231,13 @@ VIEWS.talk = (id) => {
 VIEWS.exam = (m) => {
   if (m !== 'go') {
     const h = S.exams.slice(-5).reverse().map(e => `<p>${esc(e.d)} · <b>${e.p}%</b> · ${esc(e.lv)}</p>`).join('') || '<p class="mute">Sin intentos.</p>';
-    return view(`<h2>Examen</h2><div class="card"><p>20 preguntas mixtas: significado, listening, spelling y gramática, sobre tu nivel actual.</p><button onclick="location.hash='#exam/go'">Comenzar</button></div><div class="card"><h3>Historial</h3>${h}</div>`);
+    return view(`<h2>Examen</h2><div class="card"><p>20 preguntas mixtas: significado, listening, spelling y gramática, sobre tu nivel actual.</p><button data-go="#exam/go">Comenzar</button></div><div class="card"><h3>Historial</h3>${h}</div>`);
   }
   const words = shuffle(unlockedWords()).slice(0, 14), g = shuffle(GRAM.filter(x => levelUnlocked(lvlIdx(x.level))).flatMap(x => x.exercises)).slice(0, 6);
   const qs = [...words.map((w, k) => ({ w, t: k % 3 === 0 ? 'listen' : k % 3 === 1 ? 'meaning' : 'spell' })), ...g.map(q => ({ q, t: 'gram' }))];
   let i = 0, ok = 0;
   const next = () => {
-    if (i >= qs.length) { const p = Math.round(ok / qs.length * 100); S.exams.push({ d: today(), p, lv: currentLevel().id }); tick(3); save(); return view(`<h2>${p}%</h2><div class="card">${p >= 80 ? 'Excelente. ¡Sube de nivel!' : p >= 60 ? 'Bien, sigue repasando.' : 'Repasa vocabulario y gramática.'}</div><button onclick="location.hash='#exam'">Volver</button>`); }
+    if (i >= qs.length) { const p = Math.round(ok / qs.length * 100); S.exams.push({ id: Date.now().toString(36), d: today(), p, lv: currentLevel().id }); tick(3); save(); return view(`<h2>${p}%</h2><div class="card">${p >= 80 ? 'Excelente. ¡Sube de nivel!' : p >= 60 ? 'Bien, sigue repasando.' : 'Repasa vocabulario y gramática.'}</div><button data-go="#exam">Volver</button>`); }
     const x = qs[i], hd = `<p class="mute">${i + 1}/${qs.length}</p>`, adv = c => { if (c) ok++; i++; setTimeout(next, 700); };
     if (x.t === 'gram') { view(`${hd}<div class="card"><p>${esc(x.q.q)}</p>${x.q.o.map((o, k) => `<button class="opt" data-k="${k}">${esc(o)}</button>`).join('')}</div>`); document.querySelectorAll('.opt').forEach(b => b.onclick = () => { const c = +b.dataset.k === x.q.a; b.classList.add(c ? 'ok' : 'bad'); adv(c); }); }
     else if (x.t === 'spell') { view(`${hd}<div class="card"><p>Escribe: <b>${esc(x.w.es)}</b> <button class="alt" id="sp">🔊</button></p><input type="text" id="in" autocomplete="off" autocapitalize="off"><p><button id="ck">OK</button></p></div>`); $('#sp').onclick = () => speak(x.w.en); $('#ck').onclick = () => { const c = $('#in').value.trim().toLowerCase() === x.w.en.toLowerCase(); $('#ck').disabled = true; $('#ck').classList.add(c ? 'ok' : 'bad'); adv(c); }; }
@@ -226,35 +248,37 @@ VIEWS.exam = (m) => {
 
 /* ---------- audios largos / podcasts ---------- */
 VIEWS.pods = (id) => {
-  const p = S.pods.find(x => x.id === id);
+  const p = S.pods.find(x => x.id === id && !x.del);
   if (p) {
     view(`<h2>${esc(p.title)}</h2><div class="card"><audio id="au" controls preload="metadata" src="${esc(p.url)}"></audio>
       <div class="row"><button class="alt" id="b">⏪ 15s</button><button class="alt" id="f">15s ⏩</button>
       <select id="sp" style="width:auto"><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option></select></div></div>
       <div class="card"><b>Notas / transcripción</b><textarea id="nt" rows="6" style="width:100%;background:transparent;color:inherit;border:1px solid var(--mute);border-radius:10px;padding:8px">${esc(p.notes || '')}</textarea></div>
-      <button class="alt" onclick="location.hash='#pods'">Volver</button>`);
+      <button class="alt" data-go="#pods">Volver</button>`);
     const a = $('#au'); a.currentTime = p.pos || 0;
     let last = 0; a.ontimeupdate = () => { if (Date.now() - last > 4000) { p.pos = a.currentTime; last = Date.now(); save(); } };
     a.onplay = () => tick();
     $('#b').onclick = () => a.currentTime -= 15; $('#f').onclick = () => a.currentTime += 15; $('#sp').onchange = e => a.playbackRate = +e.target.value;
-    $('#nt').onchange = e => { p.notes = e.target.value; save(); };
+    $('#nt').onchange = e => { p.notes = e.target.value; p.nt = Date.now(); save(); };
     return;
   }
   view(`<h2>Audios largos</h2>
    <div class="card"><h3>Añadir</h3><p class="es">Pega un enlace directo a un .mp3 o el RSS de un podcast (si el sitio bloquea CORS, usa el enlace del episodio).</p>
    <input type="url" id="u" placeholder="https://…/episode.mp3 o feed.xml"><p><input type="text" id="t" placeholder="Título (opcional)"></p><button id="add">Añadir</button> <span id="st" class="mute"></span></div>
-   ${S.pods.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="mute">${Math.round((x.pos || 0) / 60)} min</span><div class="row"><button onclick="location.hash='#pods/${x.id}'">Reproducir</button><button class="alt" data-del="${x.id}">Quitar</button></div></div>`).join('') || '<p class="mute">Aún no hay audios.</p>'}`);
-  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { S.pods = S.pods.filter(x => x.id !== b.dataset.del); save(); route(); });
+   ${S.pods.filter(x => !x.del).map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="mute">${Math.round((x.pos || 0) / 60)} min</span><div class="row"><button data-go="#pods/${x.id}">Reproducir</button><button class="alt" data-del="${x.id}">Quitar</button></div></div>`).join('') || '<p class="mute">Aún no hay audios.</p>'}`);
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const q = S.pods.find(x => x.id === b.dataset.del); if (q) q.del = true; save(); route(); });
   $('#add').onclick = async () => {
     const url = $('#u').value.trim(); if (!/^https?:\/\//.test(url)) return $('#st').textContent = 'URL no válida';
     let items = [{ title: $('#t').value.trim() || url.split('/').pop() || 'Audio', url }];
     if (!/\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(url)) {
       $('#st').textContent = 'Leyendo feed…';
       try {
+        if (serverUp) { const r = await fetch('/api/feed?url=' + encodeURIComponent(url)); if (!r.ok) throw 0; const j = await r.json(); items = j.items.slice(0, 20).map(i => ({ title: i.title, url: i.url })); if (!items.length) throw 0; }
+        else {
         const x = new DOMParser().parseFromString(await (await fetch(url)).text(), 'text/xml');
         items = [...x.querySelectorAll('item')].slice(0, 20).map(it => ({ title: it.querySelector('title')?.textContent || 'Episodio', url: it.querySelector('enclosure')?.getAttribute('url') })).filter(i => i.url);
-        if (!items.length) throw 0;
-      } catch { return $('#st').textContent = 'No se pudo leer el feed (CORS). Pega el enlace directo del .mp3.'; }
+        if (!items.length) throw 0; }
+      } catch { return $('#st').textContent = 'No se pudo leer el feed. Pega el enlace directo del .mp3.'; }
     }
     items.forEach(i => S.pods.push({ id: Math.random().toString(36).slice(2, 9), title: i.title, url: i.url, pos: 0 }));
     save(); route();
@@ -267,13 +291,17 @@ VIEWS.settings = () => {
   <div class="card"><b>Velocidad de voz</b><input type="range" id="r" min="0.5" max="1.2" step="0.1" value="${S.rate}" style="width:100%"></div>
   <div class="card"><label><input type="checkbox" id="ua" ${S.unlockAll ? 'checked' : ''}> Desbloquear todos los niveles</label></div>
   <div class="card"><b>PIN de acceso</b> <span class="mute">${S.pin ? '(activo)' : '(sin PIN)'}</span><p><input type="password" id="pin" inputmode="numeric" placeholder="Nuevo PIN (vacío = quitar)"></p><button id="sp">Guardar PIN</button></div>
+  <div class="card"><b>Sincronización</b> <span class="mute" id="ss"></span><div class="row"><button id="sn">Sincronizar ahora</button><button class="alt" id="lo">Cerrar sesión</button></div></div>
   <div class="card"><b>Copia de seguridad</b><div class="row"><button id="ex">Exportar</button><button class="alt" id="im">Importar</button></div><input type="file" id="fi" accept=".json" hidden></div>`);
-  $('#r').onchange = e => { S.rate = +e.target.value; save(); speak('This is my speed.'); };
-  $('#ua').onchange = e => { S.unlockAll = e.target.checked; save(); };
+  $('#r').onchange = e => { S.rate = +e.target.value; S.settingsAt = Date.now(); save(); speak('This is my speed.'); };
+  $('#ua').onchange = e => { S.unlockAll = e.target.checked; S.settingsAt = Date.now(); save(); };
   $('#sp').onclick = async () => { const v = $('#pin').value; S.pin = v ? await hash(v) : null; save(); route(); };
   $('#ex').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], { type: 'application/json' })); a.download = 'mi-ingles-backup.json'; a.click(); };
   $('#im').onclick = () => $('#fi').click();
-  $('#fi').onchange = async e => { try { S = { ...defaults(), ...JSON.parse(await e.target.files[0].text()) }; save(); route(); } catch { alert('Archivo inválido'); } };
+  $('#ss').textContent = { ok: '✔ al día', off: '⚠ sin conexión', auth: '🔒 inicia sesión', none: 'solo local', busy: '… sincronizando' }[syncStatus];
+  $('#sn').onclick = () => sync(true);
+  $('#lo').onclick = async () => { try { await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch { } location.href = '/login.html'; };
+  $('#fi').onchange = async e => { try { S = { ...defaults(), ...IEMerge.merge(S, JSON.parse(await e.target.files[0].text())), pin: S.pin }; save(); route(); } catch { alert('Archivo inválido'); } };
 };
 
 /* ---------- bloqueo por PIN ---------- */
