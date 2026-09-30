@@ -25,7 +25,7 @@
   "es": "Proponer, opinar y decidir planes con un amigo",
   "level": "B1.2",
   "track": "daily",
-  "topic": "Viajes y planes",
+  "topic": "Viajes",
   "minutes": 8,
   "turns": 5
  },
@@ -35,7 +35,7 @@
   "es": "Pedir un cambio o reembolso con educación y firmeza",
   "level": "B1.2",
   "track": "daily",
-  "topic": "Compras y servicios",
+  "topic": "Compras",
   "minutes": 8,
   "turns": 5
  },
@@ -45,7 +45,7 @@
   "es": "Debatir sobre trabajo, descanso y hábitos con opiniones matizadas",
   "level": "B2.1",
   "track": "daily",
-  "topic": "Trabajo y bienestar",
+  "topic": "Trabajo",
   "minutes": 10,
   "turns": 5
  },
@@ -79,6 +79,66 @@
   "topic": "Desarrollo de software",
   "minutes": 10,
   "dev": 2,
+  "turns": 5
+ },
+ {
+  "id": "hotel-mixup",
+  "title": "A booking problem at the hotel",
+  "es": "Resolver un problema de reserva y quejarte con cortesía",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Viajes",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "restaurant-dinner",
+  "title": "Dinner with dietary needs",
+  "es": "Pedir, preguntar por ingredientes y resolver un problema en el restaurante",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Restaurantes",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "social-media",
+  "title": "Social media, privacy and habits",
+  "es": "Debatir con un amigo sobre redes sociales, privacidad y tiempo en pantalla",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Redes sociales",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "new-laptop",
+  "title": "Choosing a new laptop",
+  "es": "Comparar dispositivos, preguntar especificaciones y decidir una compra",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Tecnología",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "flight-cancelled",
+  "title": "A cancelled flight",
+  "es": "Negociar con una aerolínea tras una cancelación y conocer tus derechos",
+  "level": "B2.2",
+  "track": "daily",
+  "topic": "Viajes",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "ai-at-work",
+  "title": "AI tools at work: a debate",
+  "es": "Debatir ventajas, riesgos y ética de la inteligencia artificial en el trabajo",
+  "level": "B2.2",
+  "track": "daily",
+  "topic": "Tecnología",
+  "minutes": 11,
   "turns": 5
  }
 ]

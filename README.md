@@ -9,6 +9,12 @@ PWA sin backend ni IA en tiempo de uso: **0 tokens**. Voz con las APIs del naveg
 - **Audios largos**: añade mp3 o RSS de podcasts; guarda posición, velocidad y notas.
 - **Privacidad**: PIN local, `noindex`, datos solo en tu navegador, exportar/importar backup.
 
+## Interfaz
+Sistema visual propio ("cabina de estudio de audio"): tinta y papel frío con cobalto y una señal caléndula, modo oscuro automático, tipografías alojadas en `fonts/` (Bricolage Grotesque + Instrument Sans) para que funcionen sin conexión. Las barras de ecualizador del logo se animan cuando la app habla o te escucha. Cinco pestañas en móvil (barra lateral en escritorio), iconos SVG (sin emojis), objetivos táctiles de 44 px, foco visible y respeto de "reducir movimiento".
+
+## Contenido
+14 conversaciones largas (B1.1 a B2.2; viajes, restaurantes, redes sociales, tecnología, salud, trabajo y desarrollo de software) y 539 palabras (`data/batches/`). Los niveles de conversación se desbloquean al completar la mitad del nivel anterior con 60 % o más.
+
 ## Conversaciones de escucha activa
 Menú **Hablar** → conversaciones largas (8-10 minutos) por nivel y tema:
 1. **Escuchas** al interlocutor (el texto está oculto; puedes ver texto/traducción, repetir o usar voz lenta).
@@ -16,7 +22,7 @@ Menú **Hablar** → conversaciones largas (8-10 minutos) por nivel y tema:
 3. **Respondes con el micrófono** (o escribiendo). `judge.js` compara lo dicho con la respuesta modelo, sus alternativas y las *ideas clave* (con sinónimos): ✅ correcto, 🟡 casi (te dice qué idea falta), ❌ otra vez. Puedes reintentar y pedir pista.
 4. Informe final por respuesta; el puntaje se guarda y se sincroniza.
 
-El reconocimiento de voz lo hace el navegador (Chrome/Edge/Safari) y evalúa **qué dijiste**, no la calidad de tu pronunciación. Los niveles se desbloquean por conversaciones (≥60 %); la pista de software sube de nivel con ≥80 %.
+El reconocimiento de voz lo hace el navegador (Chrome/Edge/Safari) y evalúa **qué dijiste**, no la calidad de tu pronunciación. La pista de software sube de nivel con ≥80 %.
 
 **Añadir conversaciones:** edita `tools/build_talks.py` (un bloque `TALK(...)` con turnos `T` tutor, `C` comprensión, `Y` respuesta) y ejecuta `python3 tools/build_talks.py`. `npm test` valida que cada respuesta modelo se apruebe a sí misma y que el nivel exista. **Añadir niveles:** una línea en `data/levels.json`.
 

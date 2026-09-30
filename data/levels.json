@@ -1,7 +1,7 @@
 [
  {
   "id": "B1.1",
-  "name": "B1 · Arranque",
+  "name": "B1.1 Arranque",
   "es": "Punto de partida: te defiendes en situaciones cotidianas",
   "can": [
    "Presentarme y hablar de mi rutina",
@@ -10,7 +10,7 @@
  },
  {
   "id": "B1.2",
-  "name": "B1 · Consolidado",
+  "name": "B1.2 Consolidado",
   "es": "Opinar, planear y contar experiencias con más fluidez",
   "can": [
    "Contar experiencias y planear con otros",
@@ -19,7 +19,7 @@
  },
  {
   "id": "B2.1",
-  "name": "B2 · Independiente",
+  "name": "B2.1 Independiente",
   "es": "Argumentar y entender textos y audios largos",
   "can": [
    "Argumentar una opinión con ejemplos",
@@ -28,7 +28,7 @@
  },
  {
   "id": "B2.2",
-  "name": "B2 · Avanzado",
+  "name": "B2.2 Avanzado",
   "es": "Matices, registro formal e informal",
   "can": [
    "Usar registro formal e informal",
@@ -37,7 +37,7 @@
  },
  {
   "id": "C1.1",
-  "name": "C1 · Competente",
+  "name": "C1.1 Competente",
   "es": "Uso flexible para trabajo y estudios",
   "can": [
    "Debatir con fluidez y precisión",
@@ -46,7 +46,7 @@
  },
  {
   "id": "C1.2",
-  "name": "C1 · Dominio",
+  "name": "C1.2 Dominio",
   "es": "Precisión y naturalidad casi nativa",
   "can": [
    "Expresarme casi sin esfuerzo",
@@ -55,7 +55,7 @@
  },
  {
   "id": "C2.1",
-  "name": "C2 · Maestría",
+  "name": "C2.1 Maestría",
   "es": "Uso natural y sutil en cualquier situación",
   "can": [
    "Resumir y reformular información compleja",

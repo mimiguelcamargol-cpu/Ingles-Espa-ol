@@ -78,9 +78,9 @@ function readJson(req) {
 const sameOrigin = req => { const o = req.headers.origin; if (!o) return true; try { return new URL(o).host === req.headers.host; } catch { return false; } };
 
 /* ---------- estáticos (lista blanca) ---------- */
-const STATIC = /^\/(index\.html|app\.js|merge\.js|judge\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|data\/(vocab|grammar|convo|levels)\.json|data\/talks\/[\w-]+\.json)$/;
-const PUBLIC = new Set(['/login.html', '/login.js', '/style.css', '/manifest.json', '/icons/icon.svg']);
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
+const STATIC = /^\/(index\.html|app\.js|merge\.js|judge\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|fonts\/[\w.-]+\.woff2|data\/(vocab|grammar|convo|levels)\.json|data\/talks\/[\w-]+\.json)$/;
+const PUBLIC = new Set(['/login.html', '/login.js', '/style.css', '/manifest.json', '/icons/icon.svg', '/fonts/BricolageGrotesque.woff2', '/fonts/InstrumentSans.woff2']);
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function serveStatic(res, p) {
   fs.readFile(path.join(ROOT, p), (e, buf) => e ? send(res, 404, 'Not found', 'text/plain') : send(res, 200, buf, TYPES[path.extname(p)] || 'application/octet-stream', { 'Cache-Control': 'no-cache' }));
 }
