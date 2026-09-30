@@ -78,7 +78,7 @@ function readJson(req) {
 const sameOrigin = req => { const o = req.headers.origin; if (!o) return true; try { return new URL(o).host === req.headers.host; } catch { return false; } };
 
 /* ---------- estáticos (lista blanca) ---------- */
-const STATIC = /^\/(index\.html|app\.js|merge\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|data\/(vocab|grammar|convo|levels)\.json)$/;
+const STATIC = /^\/(index\.html|app\.js|merge\.js|judge\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|data\/(vocab|grammar|convo|levels)\.json|data\/talks\/[\w-]+\.json)$/;
 const PUBLIC = new Set(['/login.html', '/login.js', '/style.css', '/manifest.json', '/icons/icon.svg']);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 function serveStatic(res, p) {

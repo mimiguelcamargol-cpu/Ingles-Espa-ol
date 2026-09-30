@@ -1,0 +1,84 @@
+[
+ {
+  "id": "neighbour",
+  "title": "Meeting a new neighbour",
+  "es": "Presentarte y conversar con un vecino nuevo",
+  "level": "B1.1",
+  "track": "daily",
+  "topic": "Vida diaria",
+  "minutes": 8,
+  "turns": 6
+ },
+ {
+  "id": "doctor",
+  "title": "At the doctor's",
+  "es": "Describir síntomas y entender indicaciones médicas",
+  "level": "B1.1",
+  "track": "daily",
+  "topic": "Salud",
+  "minutes": 8,
+  "turns": 6
+ },
+ {
+  "id": "weekend-trip",
+  "title": "Planning a weekend trip",
+  "es": "Proponer, opinar y decidir planes con un amigo",
+  "level": "B1.2",
+  "track": "daily",
+  "topic": "Viajes y planes",
+  "minutes": 8,
+  "turns": 5
+ },
+ {
+  "id": "returning-item",
+  "title": "Returning something to a shop",
+  "es": "Pedir un cambio o reembolso con educación y firmeza",
+  "level": "B1.2",
+  "track": "daily",
+  "topic": "Compras y servicios",
+  "minutes": 8,
+  "turns": 5
+ },
+ {
+  "id": "work-life",
+  "title": "Work-life balance and stress",
+  "es": "Debatir sobre trabajo, descanso y hábitos con opiniones matizadas",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Trabajo y bienestar",
+  "minutes": 10,
+  "turns": 5
+ },
+ {
+  "id": "interview",
+  "title": "A job interview",
+  "es": "Responder preguntas de entrevista con ejemplos concretos",
+  "level": "B2.1",
+  "track": "daily",
+  "topic": "Trabajo",
+  "minutes": 10,
+  "turns": 6
+ },
+ {
+  "id": "dev-standup",
+  "title": "The daily stand-up",
+  "es": "Contar tu avance, tus bloqueos y tus planes en una reunión diaria",
+  "level": "B1.2",
+  "track": "dev",
+  "topic": "Desarrollo de software",
+  "minutes": 8,
+  "dev": 1,
+  "turns": 5
+ },
+ {
+  "id": "dev-bug",
+  "title": "Explaining a bug to a teammate",
+  "es": "Describir un error, reproducirlo y proponer una solución",
+  "level": "B2.1",
+  "track": "dev",
+  "topic": "Desarrollo de software",
+  "minutes": 10,
+  "dev": 2,
+  "turns": 5
+ }
+]

@@ -16,6 +16,7 @@ test('sin sesión: 401 en API, redirige a login y no filtra datos', async () => 
   assert.equal(r.status, 302); assert.equal(r.headers.get('location'), '/login.html');
   assert.equal((await api('/data/vocab.json')).status, 401);
   assert.equal((await api('/server/server.js')).status, 404);
+  assert.equal((await api('/data/talks/neighbour.json')).status, 401);
   assert.equal((await api('/login.html')).status, 200);
 });
 test('login incorrecto y correcto', async () => {
@@ -26,6 +27,9 @@ test('login incorrecto y correcto', async () => {
   assert.match(r.headers.get('set-cookie'), /HttpOnly/);
   const v = await api('/data/vocab.json'); assert.equal(v.status, 200);
   assert.ok(Array.isArray(await v.json()), 'los estáticos JSON deben servirse tal cual');
+  const tk = await api('/data/talks/neighbour.json'); assert.equal(tk.status, 200); assert.equal((await tk.json()).id, 'neighbour');
+  assert.equal((await api('/data/talks/..%2f..%2fserver%2fserver.js')).status, 404);
+  assert.equal((await api('/judge.js')).status, 200);
 });
 test('sincroniza y fusiona sin perder progreso', async () => {
   const a = { srs: { 'x|noun': { b: 2, t: 10 } }, gram: { g1: 50 }, devLevel: 2, stats: { days: { '2026-01-01': 3 } } };

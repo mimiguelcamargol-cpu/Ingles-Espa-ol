@@ -25,3 +25,7 @@ input[type=text],input[type=url],input[type=password],select{width:100%;padding:
 .lock>div{width:100%;max-width:320px;text-align:center}
 .locked{opacity:.45}
 audio{width:100%}
+
+.mic{background:var(--acc);font-size:18px;padding:14px 20px}.mic.rec{background:var(--bad);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.live{min-height:1.4em}.card.ok{border-left:4px solid var(--ok)}.card.close{border-left:4px solid #eab308}.card.no{border-left:4px solid var(--bad)}

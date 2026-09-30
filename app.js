@@ -19,10 +19,11 @@ const tick = (n = 1) => { S.stats.days[today()] = (S.stats.days[today()] || 0) +
 const streak = () => { let n = 0, d = new Date(); while (S.stats.days[d.toISOString().slice(0, 10)]) { n++; d = new Date(d - DAY); } return n; };
 
 /* ---------- datos ---------- */
-let VOCAB = [], GRAM = [], CONVO = [], LEVELS = [];
+let VOCAB = [], GRAM = [], CONVO = [], LEVELS = [], TALKS = [];
 const load = f => fetch('data/' + f + '.json').then(r => r.json());
 async function init() {
   [VOCAB, GRAM, CONVO, LEVELS] = await Promise.all([load('vocab'), load('grammar'), load('convo'), load('levels')]);
+  TALKS = await fetch('data/talks/index.json').then(r => r.json()).catch(() => []);
   VOCAB = VOCAB.map(([en, es, pos, lv, ex]) => ({ id: en + '|' + pos, en, es, pos, lv, ex }));
   addEventListener('hashchange', route);
   addEventListener('online', () => sync());
@@ -193,14 +194,148 @@ VIEWS.grammar = (id) => {
   $('#go').onclick = show;
 };
 
-/* ---------- conversación ---------- */
-VIEWS.talk = (id) => {
-  const c = CONVO.find(x => x.id === id);
-  if (!c) {
-    const dev = CONVO.filter(x => x.track === 'dev'), daily = CONVO.filter(x => x.track === 'daily');
-    const item = x => { const lock = x.track === 'dev' && x.level > S.devLevel; const sc = S.convo[x.id]; return `<div class="card ${lock ? 'locked' : ''}"><b>${esc(x.title)}</b> <span class="pill">nivel ${x.level}</span> ${sc != null ? '✅ ' + sc + '%' : ''} ${lock ? '🔒' : `<div><button data-go="#talk/${x.id}">Empezar</button></div>`}</div>`; };
-    return view(`<h2>Conversación</h2><h3>💻 Desarrollo de software <span class="pill">tu nivel: ${S.devLevel}</span></h3><p class="es">La dificultad sube conforme completas cada nivel con ≥80%.</p>${dev.map(item).join('')}<h3>☕ Vida diaria</h3>${daily.map(item).join('')}`);
+/* ---------- conversación (escucha activa) ---------- */
+const PREF_KEY = 'ie.pref.v1';
+let PREF = { showText: false, showEs: false, slow: false };
+try { PREF = { ...PREF, ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; } catch { }
+const setPref = (k, v) => { PREF[k] = v; try { localStorage.setItem(PREF_KEY, JSON.stringify(PREF)); } catch { } };
+const ICON = { ok: '✅', close: '🟡', no: '❌' };
+
+function advanceDev() {
+  const items = [...CONVO.filter(x => x.track === 'dev').map(x => ({ id: x.id, lv: x.level })), ...TALKS.filter(x => x.track === 'dev').map(x => ({ id: x.id, lv: x.dev || 1 }))];
+  const cur = items.filter(x => x.lv === S.devLevel);
+  if (cur.length && cur.every(x => (S.convo[x.id] || 0) >= 80) && items.some(x => x.lv > S.devLevel)) S.devLevel++;
+}
+function talkLock(t) {
+  if (S.unlockAll) return '';
+  if (t.track === 'dev' && (t.dev || 1) > S.devLevel) return `Completa el nivel ${S.devLevel} de software con ≥80 %`;
+  const i = lvlIdx(t.level); if (i <= 0) return '';
+  const prev = TALKS.filter(x => lvlIdx(x.level) === i - 1 && x.track === t.track);
+  return prev.every(x => (S.convo[x.id] || 0) >= 60) ? '' : `Termina las conversaciones de ${LEVELS[i - 1].id} con ≥60 %`;
+}
+function recognize(h) {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) return null;
+  const r = new R(); r.lang = 'en-US'; r.interimResults = true; r.maxAlternatives = 3; r.continuous = false;
+  let alts = [], failed = false;
+  r.onresult = e => { const res = e.results[e.results.length - 1]; h.interim(res[0].transcript); if (res.isFinal) alts = Array.from(res).map(a => a.transcript); };
+  r.onerror = e => { failed = true; h.error(e.error); };
+  r.onend = () => { if (!failed) h.done(alts); };
+  try { r.start(); } catch { return null; }
+  return r;
+}
+const micMsg = e => e === 'not-allowed' || e === 'service-not-allowed' ? 'Permite el micrófono en el navegador (icono del candado) y vuelve a intentar.' : e === 'no-speech' ? 'No te escuché. Acércate al micrófono e inténtalo otra vez.' : e === 'network' ? 'El reconocimiento de voz necesita internet en este navegador. Usa "Escribir".' : 'No pude usar el micrófono (' + e + '). Usa "Escribir".';
+
+VIEWS.talk = async (id) => {
+  const quick = CONVO.find(x => x.id === id);
+  if (quick) return playQuick(quick);
+  if (id) {
+    if (!/^[\w-]+$/.test(id)) return VIEWS.talk();
+    let t; try { t = await (await fetch('data/talks/' + id + '.json')).json(); } catch { return view('<div class="card">No pude cargar esta conversación (¿sin conexión y sin verla antes?).</div><button data-go="#talk">Volver</button>'); }
+    return talkIntro(t);
   }
+  const by = LEVELS.map(l => ({ l, ts: TALKS.filter(t => t.level === l.id) })).filter(g => g.ts.length);
+  const card = t => { const lock = talkLock(t), sc = S.convo[t.id]; return `<div class="card ${lock ? 'locked' : ''}"><b>${t.track === 'dev' ? '💻' : '☕'} ${esc(t.title)}</b> ${sc != null ? `<span class="pill">✅ ${sc}%</span>` : ''}<p class="es">${esc(t.es)}</p><p class="mute">${esc(t.topic)} · ${t.turns} respuestas · ~${t.minutes} min</p>${lock ? `<p class="mute">🔒 ${esc(lock)}</p>` : `<button data-go="#talk/${t.id}">Empezar</button>`}</div>`; };
+  const quickCard = x => { const lock = x.track === 'dev' && x.level > S.devLevel; const sc = S.convo[x.id]; return `<div class="card ${lock ? 'locked' : ''}"><b>${esc(x.title)}</b> <span class="pill">nivel ${x.level}</span> ${sc != null ? '✅ ' + sc + '%' : ''} ${lock ? '🔒' : `<div><button data-go="#talk/${x.id}">Empezar</button></div>`}</div>`; };
+  view(`<h2>Conversación</h2><p class="es">Escucha primero, responde con el micrófono y recibe corrección al instante. Tu nivel de software: <b>${S.devLevel}</b>.</p>
+  ${by.map(g => `<h3>${esc(g.l.name)}</h3><p class="es">${esc(g.l.es)}</p>${g.ts.map(card).join('')}`).join('') || '<p class="mute">Sin conversaciones cargadas.</p>'}
+  <h3>⚡ Práctica rápida</h3>${CONVO.map(quickCard).join('')}`);
+};
+
+function talkIntro(t) {
+  view(`<h2>${esc(t.title)}</h2><p class="es">${esc(t.es)}</p>
+  <div class="card"><b>🎯 Objetivo</b><p>${esc(t.goal)}</p><span class="pill">${esc(t.level)}</span> <span class="pill">~${t.minutes} min</span></div>
+  <div class="card"><b>🗣️ Frases útiles</b>${t.phrases.map(([e, s]) => `<p><button class="alt" data-s="${esc(e)}">🔊</button> <b>${esc(e)}</b><br><span class="es">${esc(s)}</span></p>`).join('')}</div>
+  <div class="card"><b>⚙️ Cómo practicar</b>
+   <p><label><input type="checkbox" id="p1" ${PREF.showText ? 'checked' : ''}> Mostrar el texto de lo que escucho</label></p>
+   <p><label><input type="checkbox" id="p2" ${PREF.showEs ? 'checked' : ''}> Mostrar traducción al español</label></p>
+   <p><label><input type="checkbox" id="p3" ${PREF.slow ? 'checked' : ''}> Voz lenta</label></p>
+   <p class="es">Consejo: empieza sin texto para entrenar el oído; si te pierdes, pulsa "Ver texto".</p></div>
+  <div class="row"><button id="go">Empezar</button><button class="alt" data-go="#talk">Volver</button></div>`);
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => speak(b.dataset.s));
+  $('#p1').onchange = e => setPref('showText', e.target.checked); $('#p2').onchange = e => setPref('showEs', e.target.checked); $('#p3').onchange = e => setPref('slow', e.target.checked);
+  $('#go').onclick = () => playTalk(t);
+}
+
+function playTalk(t) {
+  const total = t.turns.filter(x => x.y || x.c).length;
+  const res = []; // {type, score, verdict, said, model}
+  let i = 0, lastTutor = null;
+  const say = (txt, force) => speak(txt, PREF.slow || force ? 0.65 : undefined);
+  let vt = PREF.showText, ve = PREF.showEs;
+  const tutorCard = turn => `<div class="card"><div class="row"><button id="sp">🔊 Escuchar</button><button class="alt" id="sl">🐢 Lento</button><button class="alt" id="tx">${vt ? 'Ocultar texto' : '👁 Ver texto'}</button><button class="alt" id="te" title="Traducción">🌐</button></div>
+    ${vt ? `<div class="bubble tutor">${esc(turn.t)}</div>` : '<p class="mute">🎧 Escucha con atención…</p>'}${ve ? `<p class="es">${esc(turn.es)}</p>` : ''}</div>`;
+  const wireTutor = (turn, redraw) => { $('#sp').onclick = () => say(turn.t); $('#sl').onclick = () => say(turn.t, true); $('#tx').onclick = () => { vt = !vt; redraw(); }; $('#te').onclick = () => { ve = !ve; redraw(); }; };
+  const next = () => { i++; step(); };
+  function step() {
+    if (i >= t.turns.length) return finish();
+    const turn = t.turns[i];
+    if (turn.t) {
+      lastTutor = turn; vt = PREF.showText; ve = PREF.showEs;
+      const draw = () => { view(`<p class="mute">${res.length}/${total} · ${esc(t.title)}</p>${tutorCard(turn)}<div class="row"><button id="ok">Entendí, continuar ➜</button><button class="alt" id="ex">Salir</button></div>`); wireTutor(turn, draw); $('#ok').onclick = next; $('#ex').onclick = () => { speechSynthesis.cancel(); location.hash = '#talk'; }; };
+      draw(); say(turn.t); return;
+    }
+    if (turn.c) return question(turn.c);
+    return respond(turn.y);
+  }
+  function question(c) {
+    const opts = c.o.map((o, k) => ({ o, k }));
+    view(`<p class="mute">${res.length + 1}/${total} · comprensión</p>${lastTutor ? tutorCard(lastTutor) : ''}<div class="card"><p><b>${esc(c.q)}</b> <button class="alt" id="qs">🔊</button></p><p class="es">${esc(c.es)}</p>${opts.map(x => `<button class="opt" data-k="${x.k}">${esc(x.o)}</button>`).join('')}</div>`);
+    if (lastTutor) wireTutor(lastTutor, () => question(c));
+    $('#qs').onclick = () => say(c.q);
+    document.querySelectorAll('.opt').forEach(b => b.onclick = () => { const ok = +b.dataset.k === c.a; b.classList.add(ok ? 'ok' : 'bad'); document.querySelectorAll('.opt').forEach(x => x.disabled = true); res.push({ type: 'c', score: ok ? 1 : 0, verdict: ok ? 'ok' : 'no', said: c.o[+b.dataset.k], model: c.o[c.a] }); tick(); setTimeout(next, ok ? 700 : 1600); });
+  }
+  function respond(y) {
+    let best = null, tries = 0, rec = null, typed = false;
+    const draw = fb => {
+      view(`<p class="mute">${res.length + 1}/${total} · tu respuesta</p>${lastTutor ? tutorCard(lastTutor) : ''}
+      <div class="card"><b>Responde en inglés</b> <span class="es">(${esc(y.es)})</span>
+       <p class="mute" id="hint" hidden>Pista: <i>${esc(y.hint || y.say.split(' ').slice(0, 3).join(' ') + '…')}</i></p>
+       <div class="row" style="margin:10px 0">${typed ? `<input type="text" id="ti" placeholder="Escribe tu respuesta" autocomplete="off"><button id="tsend">Enviar</button>` : `<button id="mic" class="mic">🎙️ Hablar</button><button class="alt" id="ty">⌨️ Escribir</button>`}<button class="alt" id="hb">💡 Pista</button></div>
+       <div id="live" class="live mute"></div></div>
+      <div id="fb">${fb || ''}</div>`);
+      if (lastTutor) wireTutor(lastTutor, () => draw(fb));
+      $('#hb').onclick = () => { $('#hint').hidden = false; };
+      if (typed) { $('#tsend').onclick = () => evaluate([$('#ti').value]); $('#ti').onkeydown = e => { if (e.key === 'Enter') evaluate([$('#ti').value]); }; }
+      else {
+        $('#ty').onclick = () => { typed = true; draw(fb); $('#ti').focus(); };
+        $('#mic').onclick = () => {
+          if (rec) { rec.stop(); return; }
+          speechSynthesis.cancel();
+          const b = $('#mic'); b.textContent = '⏹ Escuchando… (toca para terminar)'; b.classList.add('rec');
+          rec = recognize({ interim: s => { $('#live').textContent = '…' + s; }, done: a => { rec = null; a.length ? evaluate(a) : draw('<div class="card">No te escuché. Inténtalo otra vez o usa "Escribir".</div>'); }, error: e => { rec = null; draw(`<div class="card">${esc(micMsg(e))}</div>`); } });
+          if (!rec) draw('<div class="card">Tu navegador no permite reconocimiento de voz. Usa Chrome o Edge, o el botón "Escribir".</div>');
+        };
+      }
+    };
+    const evaluate = alts => {
+      const scored = alts.filter(a => a && a.trim()).map(a => ({ a, r: IEJudge.judge(a, y) })).sort((p, q) => q.r.score - p.r.score);
+      if (!scored.length) return draw('<div class="card">No recibí texto. Inténtalo de nuevo.</div>');
+      const { a, r } = scored[0]; tries++;
+      if (!best || r.score > best.r.score) best = { a, r };
+      const msg = r.verdict === 'ok' ? '¡Correcto! Se entiende perfectamente.' : r.verdict === 'close' ? 'Casi. Falta o cambia alguna idea.' : 'Todavía no. Escucha el modelo y vuelve a intentarlo.';
+      const idea = r.miss.length ? `<p>Ideas que faltan: ${r.miss.map(m => `<b>${esc(m)}</b>`).join(', ')}</p>` : '';
+      draw(`<div class="card ${r.verdict}"><h3>${ICON[r.verdict]} ${msg} <span class="pill">${Math.round(r.score * 100)}%</span></h3><p>Dijiste: <i>${esc(a)}</i></p>${idea}
+        <p>Modelo: <b>${esc(r.best)}</b> <button class="alt" id="ms">🔊</button></p><p class="es">${esc(y.es)}</p>
+        <div class="row"><button class="alt" id="rt">🔁 Reintentar</button><button id="nx">${r.verdict === 'no' && tries < 2 ? 'Saltar' : 'Continuar ➜'}</button></div></div>`);
+      $('#ms').onclick = () => say(r.best); $('#rt').onclick = () => { draw(''); };
+      $('#nx').onclick = () => { res.push({ type: 'y', score: best.r.verdict === 'ok' ? 1 : best.r.verdict === 'close' ? 0.5 : 0, verdict: best.r.verdict, said: best.a, model: y.say, es: y.es }); tick(2); next(); };
+    };
+    draw('');
+  }
+  function finish() {
+    const p = Math.round(res.reduce((s, x) => s + x.score, 0) / total * 100);
+    S.convo[t.id] = Math.max(S.convo[t.id] || 0, p);
+    if (t.track === 'dev') advanceDev();
+    tick(3); save();
+    const rows = res.filter(x => x.type === 'y').map(x => `<div class="card"><b>${ICON[x.verdict]}</b> <i>${esc(x.said)}</i>${x.verdict !== 'ok' ? `<br><span class="mute">Mejor: ${esc(x.model)}</span>` : ''}<br><span class="es">${esc(x.es)}</span></div>`).join('');
+    view(`<h2>${p >= 80 ? '🎉' : p >= 60 ? '👍' : '💪'} ${p}%</h2><p>${p >= 80 ? 'Excelente. Dominas esta conversación.' : p >= 60 ? 'Bien. Repítela para consolidar.' : 'Vuelve a escucharla sin mirar el texto y repite las frases del modelo.'}</p>${t.track === 'dev' ? `<p class="mute">Nivel de software: ${S.devLevel}</p>` : ''}<h3>Tus respuestas</h3>${rows}<div class="row"><button data-go="#talk/${esc(t.id)}">Repetir</button><button class="alt" data-go="#talk">Más conversaciones</button></div>`);
+  }
+  step();
+}
+
+/* práctica rápida (diálogos cortos de opción múltiple) */
+function playQuick(c) {
   let i = 0, right = 0, total = c.turns.filter(t => t.y).length;
   const log = [];
   const step = () => {
@@ -211,21 +346,18 @@ VIEWS.talk = (id) => {
     view(`<h3>${esc(c.title)}</h3>${log.join('')}<div class="row"><button class="alt" id="sp">🔊 Escuchar</button></div><p class="mute">Elige (o di en voz alta) la mejor respuesta:</p>${opts.map((o, k) => `<div class="row"><button class="opt" style="flex:1" data-k="${k}">${esc(o[0])}</button><button class="alt" data-m="${k}" title="Decir en voz alta">🎙️</button></div>`).join('')}<div id="fb"></div>`);
     $('#sp').onclick = () => speak(last ? last.t : '');
     if (last) speak(last.t);
-    const answer = (o, viaVoice) => { const ok = !!o[1]; if (ok) right++; log.push(`<div class="bubble you">${esc(o[0])}<div class="es" style="color:#04202e99">${esc(o[2])}</div></div>`); tick(2); i++; if (!ok) { const best = t.y.find(y => y[1]); $('#fb').innerHTML = `<div class="card">❌ Mejor: <b>${esc(best[0])}</b></div>`; setTimeout(step, 1800); } else step(); };
+    const answer = o => { const ok = !!o[1]; if (ok) right++; log.push(`<div class="bubble you">${esc(o[0])}<div class="es" style="color:#04202e99">${esc(o[2])}</div></div>`); tick(2); i++; if (!ok) { const best = t.y.find(y => y[1]); $('#fb').innerHTML = `<div class="card">❌ Mejor: <b>${esc(best[0])}</b></div>`; setTimeout(step, 1800); } else step(); };
     document.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(opts[b.dataset.k]));
-    document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const o = opts[b.dataset.m]; listen(txt => { if (!txt) return; const s = similarity(txt, o[0]); $('#fb').innerHTML = `<div class="card">Dijiste: <i>${esc(txt)}</i> · precisión ${Math.round(s * 100)}%</div>`; if (s >= 0.7) setTimeout(() => answer(o, true), 900); }); });
+    document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const o = opts[b.dataset.m]; listen(txt => { if (!txt) return; const s = IEJudge.judge(txt, { say: o[0] }).score; $('#fb').innerHTML = `<div class="card">Dijiste: <i>${esc(txt)}</i> · precisión ${Math.round(s * 100)}%</div>`; if (s >= 0.7) setTimeout(() => answer(o), 900); }); });
   };
   const finish = () => {
     const p = Math.round(right / total * 100); S.convo[c.id] = Math.max(S.convo[c.id] || 0, p);
-    if (c.track === 'dev' && c.level === S.devLevel) {
-      const all = CONVO.filter(x => x.track === 'dev' && x.level === S.devLevel);
-      if (all.every(x => (S.convo[x.id] || 0) >= 80) && CONVO.some(x => x.track === 'dev' && x.level > S.devLevel)) S.devLevel++;
-    }
+    if (c.track === 'dev') advanceDev();
     save();
     view(`<h2>${p}%</h2>${log.join('')}<button data-go="#talk">Volver</button>`);
   };
   step();
-};
+}
 
 /* ---------- examen ---------- */
 VIEWS.exam = (m) => {
