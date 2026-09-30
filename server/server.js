@@ -158,5 +158,5 @@ async function handler(req, res) {
 }
 
 const server = http.createServer(handler);
-if (require.main === module) server.listen(PORT, () => console.log(`Mi Inglés en http://localhost:${PORT}  (datos: ${DATA_DIR})`));
+if (require.main === module) server.listen(PORT, () => console.log(`Mi Inglés v${require('../package.json').version} en http://localhost:${PORT}  (datos: ${DATA_DIR})`));
 module.exports = { server, parseFeed, privateIp };

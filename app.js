@@ -5,6 +5,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const rnd = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const ic = (n, c = '') => `<svg class="ico ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const APP_VERSION = '1.2.0';
 const DAY = 864e5;
 const BOX_DAYS = [0, 1, 2, 4, 8, 16, 32];
 
@@ -456,7 +457,8 @@ VIEWS.settings = () => {
   <div class="card"><label><input type="checkbox" id="ua" ${S.unlockAll ? 'checked' : ''}> Desbloquear todos los niveles</label></div>
   <div class="card"><b>PIN de acceso</b> <span class="mute">${S.pin ? '(activo)' : '(sin PIN)'}</span><p><input type="password" id="pin" inputmode="numeric" placeholder="Nuevo PIN (vacío = quitar)"></p><button id="sp">Guardar PIN</button></div>
   <div class="card"><b>Sincronización</b> <span class="mute" id="ss"></span><div class="row"><button id="sn">Sincronizar ahora</button><button class="alt" id="lo">Cerrar sesión</button></div></div>
-  <div class="card"><b>Copia de seguridad</b><div class="row"><button id="ex">Exportar</button><button class="alt" id="im">Importar</button></div><input type="file" id="fi" accept=".json" hidden></div>`);
+  <div class="card"><b>Copia de seguridad</b><div class="row"><button id="ex">Exportar</button><button class="alt" id="im">Importar</button></div><input type="file" id="fi" accept=".json" hidden></div>
+  <p class="es">Versión ${APP_VERSION} · ${TALKS.length} conversaciones · ${VOCAB.length} palabras</p>`);
   $('#r').onchange = e => { S.rate = +e.target.value; S.settingsAt = Date.now(); save(); speak('This is my speed.'); };
   $('#ua').onchange = e => { S.unlockAll = e.target.checked; S.settingsAt = Date.now(); save(); };
   $('#sp').onclick = async () => { const v = $('#pin').value; S.pin = v ? await hash(v) : null; save(); route(); };

@@ -41,3 +41,8 @@ test('judge: tolera contracciones, sinónimos y detecta ideas faltantes', () => 
   const c = judge('a quiet place', spec); assert.ok(c.miss.includes('work'));
   assert.equal(judge('', spec).verdict, 'no');
 });
+
+test('la versión de la app coincide con package.json', () => {
+  const v = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8'), new RegExp(`APP_VERSION = '${v.replace(/\./g, '\\.')}'`));
+});
