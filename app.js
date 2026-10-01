@@ -5,13 +5,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const rnd = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const ic = (n, c = '') => `<svg class="ico ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const DAY = 864e5;
 const BOX_DAYS = [0, 1, 2, 4, 8, 16, 32];
 
 /* ---------- estado ---------- */
 const KEY = 'ie.state.v1';
-const defaults = () => ({ pin: null, rate: 0.9, unlockAll: false, srs: {}, gram: {}, convo: {}, devLevel: 1, exams: [], pods: [], stats: { days: {} }, settingsAt: 0 });
+const defaults = () => ({ pin: null, rate: 0.9, unlockAll: false, srs: {}, gram: {}, convo: {}, devLevel: 1, exams: [], pods: [], reads: [], stats: { days: {} }, settingsAt: 0 });
 let S;
 try { S = { ...defaults(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { S = defaults(); }
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { } };
@@ -107,7 +107,7 @@ async function sync(manual) {
 const view = html => { const m = $('#app'); m.innerHTML = html; m.focus({ preventScroll: true }); scrollTo(0, 0); };
 function route() {
   const r = (location.hash || '#home').slice(1).split('/');
-  const tab = ['grammar', 'exam', 'settings', 'more'].includes(r[0]) ? 'more' : r[0];
+  const tab = ['grammar', 'exam', 'settings', 'more'].includes(r[0]) ? 'more' : r[0] === 'pods' ? 'read' : r[0];
   document.querySelectorAll('#nav a').forEach(a => { const on = a.getAttribute('href') === '#' + tab; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('#lvl').textContent = LEVELS.length ? currentLevel().id : '';
   (VIEWS[r[0]] || VIEWS.home)(r[1], r[2]);
@@ -427,7 +427,7 @@ VIEWS.pods = (id) => {
     $('#nt').onchange = e => { p.notes = e.target.value; p.nt = Date.now(); save(); };
     return;
   }
-  view(`<h2>Audios largos</h2>
+  view(`${typeof readTabs === 'function' ? readTabs('p') : ''}<h2>Audios largos</h2>
    <div class="card"><h3>Añadir</h3><p class="es">Pega un enlace directo a un .mp3 o el RSS de un podcast (si el sitio bloquea CORS, usa el enlace del episodio).</p>
    <input type="url" id="u" placeholder="https://…/episode.mp3 o feed.xml"><p><input type="text" id="t" placeholder="Título (opcional)"></p><button id="add">Añadir</button> <span id="st" class="mute"></span></div>
    ${S.pods.filter(x => !x.del).map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="mute">${Math.round((x.pos || 0) / 60)} min</span><div class="row"><button data-go="#pods/${x.id}">Reproducir</button><button class="alt" data-del="${x.id}">Quitar</button></div></div>`).join('') || '<p class="mute">Aún no hay audios.</p>'}`);
@@ -480,4 +480,4 @@ function gate() {
   const go = async () => { if (await hash($('#lp').value) === S.pin) { sessionStorage.setItem('ie.ok', '1'); el.hidden = true; init(); } else $('#le').textContent = 'PIN incorrecto'; };
   $('#lg').onclick = go; $('#lp').onkeydown = e => e.key === 'Enter' && go();
 }
-gate();
+document.addEventListener('DOMContentLoaded', gate);

@@ -64,7 +64,7 @@ const noteFail = ip => fails.get(ip).push(Date.now());
 const HEADERS = {
   'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer',
   'X-Robots-Tag': 'noindex, nofollow',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src *; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src *; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 };
 const send = (res, code, body, type = 'application/json', extra = {}) => { res.writeHead(code, { ...HEADERS, 'Content-Type': type, 'Cache-Control': 'no-store', ...extra }); res.end(type === 'application/json' && typeof body !== 'string' && !Buffer.isBuffer(body) ? JSON.stringify(body) : body); };
 function readJson(req) {
@@ -78,11 +78,11 @@ function readJson(req) {
 const sameOrigin = req => { const o = req.headers.origin; if (!o) return true; try { return new URL(o).host === req.headers.host; } catch { return false; } };
 
 /* ---------- estáticos (lista blanca) ---------- */
-const STATIC = /^\/(index\.html|app\.js|merge\.js|judge\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|fonts\/[\w.-]+\.woff2|data\/(vocab|grammar|convo|levels)\.json|data\/talks\/[\w-]+\.json)$/;
+const STATIC = /^\/(index\.html|app\.js|merge\.js|judge\.js|readlib\.js|reader\.js|style\.css|sw\.js|manifest\.json|login\.html|login\.js|icons\/[\w.-]+|fonts\/[\w.-]+\.woff2|data\/(vocab|grammar|convo|levels)\.json|data\/talks\/[\w-]+\.json|vendor\/tesseract\/(?:lang\/)?[\w.-]+)$/;
 const PUBLIC = new Set(['/login.html', '/login.js', '/style.css', '/manifest.json', '/icons/icon.svg', '/fonts/BricolageGrotesque.woff2', '/fonts/InstrumentSans.woff2']);
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.gz': 'application/gzip' };
 function serveStatic(res, p) {
-  fs.readFile(path.join(ROOT, p), (e, buf) => e ? send(res, 404, 'Not found', 'text/plain') : send(res, 200, buf, TYPES[path.extname(p)] || 'application/octet-stream', { 'Cache-Control': 'no-cache' }));
+  fs.readFile(path.join(ROOT, p), (e, buf) => e ? send(res, 404, 'Not found', 'text/plain') : send(res, 200, buf, TYPES[path.extname(p)] || 'application/octet-stream', { 'Cache-Control': p.startsWith('/vendor/') ? 'private, max-age=86400' : 'no-cache' }));
 }
 
 /* ---------- lector RSS con protección SSRF ---------- */
@@ -111,6 +111,44 @@ function parseFeed(xml) {
   return { title, items };
 }
 
+/* ---------- diccionario y gramática (servicios externos fijos, con caché) ---------- */
+let outFetch = (u, o) => fetch(u, o);
+const setOutFetch = f => { outFetch = f; };
+const DICT_FILE = path.join(DATA_DIR, 'dict-cache.json');
+let dictCache = {}; try { dictCache = JSON.parse(fs.readFileSync(DICT_FILE, 'utf8')); } catch { }
+function cachePut(k, v) {
+  dictCache[k] = v;
+  const keys = Object.keys(dictCache); if (keys.length > 5000) delete dictCache[keys[0]];
+  try { fs.writeFileSync(DICT_FILE + '.tmp', JSON.stringify(dictCache), { mode: 0o600 }); fs.renameSync(DICT_FILE + '.tmp', DICT_FILE); } catch { }
+}
+const getJson = async (url, opt) => { const r = await outFetch(url, { signal: AbortSignal.timeout(7000), headers: { 'User-Agent': 'MiIngles/1.0' }, ...opt }); if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; } return r.json(); };
+async function translate(w, from, to) {
+  const j = await getJson(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(w)}&langpair=${from}|${to}`);
+  const out = []; const add = t => { t = String(t || '').trim().toLowerCase(); if (t && t !== w.toLowerCase() && !out.includes(t) && !/mymemory|invalid/i.test(t)) out.push(t); };
+  (j.matches || []).slice(0, 8).forEach(m => add(m.translation)); add(j.responseData && j.responseData.translatedText);
+  return out.slice(0, 4);
+}
+async function defineWord(w, from) {
+  const key = from + ':' + w.toLowerCase(); if (dictCache[key]) return dictCache[key];
+  let out;
+  if (from === 'es') out = { word: w, from, en: await translate(w, 'es', 'en').catch(() => []) };
+  else {
+    const [dict, es] = await Promise.all([getJson('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w.toLowerCase())).catch(e => e.status === 404 ? null : Promise.reject(e)), translate(w, 'en', 'es').catch(() => [])]);
+    const e = Array.isArray(dict) ? dict[0] : null;
+    out = { word: w, from, found: !!e, phonetic: e ? (e.phonetic || ((e.phonetics || []).find(p => p.text) || {}).text || '') : '', meanings: e ? (e.meanings || []).slice(0, 3).map(m => ({ pos: m.partOfSpeech, defs: (m.definitions || []).slice(0, 2).map(d => ({ d: d.definition, ex: d.example || '' })) })) : [], es };
+  }
+  if ((out.found || (out.es && out.es.length) || (out.en && out.en.length))) cachePut(key, out);
+  return out;
+}
+const gramHits = []; 
+async function grammarCheck(text) {
+  const now = Date.now(); while (gramHits.length && now - gramHits[0] > 60000) gramHits.shift();
+  if (gramHits.length >= 20) { const e = new Error('rate'); e.code = 429; throw e; } gramHits.push(now);
+  const body = new URLSearchParams({ text, language: 'en-US', disabledCategories: 'CASING,TYPOGRAPHY,PUNCTUATION', level: 'default' });
+  const j = await getJson('https://api.languagetool.org/v2/check', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'User-Agent': 'MiIngles/1.0' }, body });
+  return { matches: (j.matches || []).slice(0, 40).map(m => ({ offset: m.offset, length: m.length, message: m.message, replacements: (m.replacements || []).slice(0, 3).map(r => r.value), rule: m.rule && m.rule.id })) };
+}
+
 /* ---------- rutas ---------- */
 async function handler(req, res) {
   const u = new URL(req.url, 'http://x'), p = u.pathname, ip = req.socket.remoteAddress;
@@ -137,6 +175,16 @@ async function handler(req, res) {
         if (JSON.stringify(merged) !== JSON.stringify(db.state)) { db = { rev: db.rev + 1, state: merged }; persist(); }
         return send(res, 200, db);
       }
+      if (p === '/api/define' && req.method === 'GET') {
+        const w = (u.searchParams.get('word') || '').trim(), from = u.searchParams.get('from') === 'es' ? 'es' : 'en';
+        if (!/^[A-Za-zÀ-ſ][A-Za-zÀ-ſ' -]{0,39}$/.test(w)) return send(res, 400, { error: 'palabra no válida' });
+        try { return send(res, 200, await defineWord(w, from)); } catch (e) { return send(res, 502, { error: 'diccionario no disponible' }); }
+      }
+      if (p === '/api/grammar' && req.method === 'POST') {
+        const b = await readJson(req);
+        if (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 3000) return send(res, 400, { error: 'texto no válido (máx. 3000 caracteres)' });
+        try { return send(res, 200, await grammarCheck(b.text)); } catch (e) { return send(res, e.code === 429 ? 429 : 502, { error: e.code === 429 ? 'demasiadas consultas, espera un minuto' : 'corrector no disponible' }); }
+      }
       if (p === '/api/feed' && req.method === 'GET') {
         try { return send(res, 200, parseFeed(await safeFetch(u.searchParams.get('url') || ''))); }
         catch (e) { return send(res, 502, { error: String(e.message || e) }); }
@@ -159,4 +207,4 @@ async function handler(req, res) {
 
 const server = http.createServer(handler);
 if (require.main === module) server.listen(PORT, () => console.log(`Mi Inglés v${require('../package.json').version} en http://localhost:${PORT}  (datos: ${DATA_DIR})`));
-module.exports = { server, parseFeed, privateIp };
+module.exports = { server, parseFeed, privateIp, setOutFetch };

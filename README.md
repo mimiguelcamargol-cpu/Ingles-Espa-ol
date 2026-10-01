@@ -9,6 +9,19 @@ PWA sin backend ni IA en tiempo de uso: **0 tokens**. Voz con las APIs del naveg
 - **Audios largos**: añade mp3 o RSS de podcasts; guarda posición, velocidad y notas.
 - **Privacidad**: PIN local, `noindex`, datos solo en tu navegador, exportar/importar backup.
 
+## Lectura con foto
+Pestaña **Leer**: sube la foto de una página (galería, cámara, arrastrar o pegar con Ctrl+V) o pega un texto.
+- **OCR local**: el texto se reconoce en tu dispositivo con Tesseract (`vendor/tesseract/`, ~11 MB, se guarda para usarlo sin conexión). La imagen nunca sale de tu equipo. Revisa y corrige el texto antes de guardarlo.
+- **Escuchar**: una profesora lee el texto en voz alta y la palabra actual se resalta en vivo (con respaldo por tiempo si el navegador no envía eventos). Pausa, frase anterior/siguiente y velocidad. Toca cualquier palabra para ver su significado, o pregunta con el micrófono en español o inglés: «¿qué significa neighbour?», «what does this word mean», «repite», «sigue», «más lento».
+- **Leer yo**: lees una frase en voz alta y se marca cada palabra (bien, parecida, otra palabra, omitida) con su pronunciación para repasar.
+- **Mi turno**: cuentas el texto con tus palabras (hablado o escrito) y se corrigen gramática y ortografía, con la versión mejorada para escuchar.
+
+**Límites que conviene saber**
+- La voz es la que traiga tu navegador. No existe acento de Boston en las voces del navegador: se elige automáticamente la voz femenina estadounidense más natural disponible (en Microsoft Edge, las voces «Natural» como Aria, Jenny o Michelle son las mejores) y puedes cambiarla en «Voz y velocidad».
+- La pronunciación se evalúa con el reconocimiento de voz del navegador: detecta palabras dichas distinto o no dichas, pero no mide el acento ni la entonación con precisión.
+- El OCR funciona con texto impreso (no con letra manuscrita); la foto debe estar nítida y de frente.
+- **Privacidad**: el significado de las palabras usa los servicios gratuitos dictionaryapi.dev y MyMemory (se envía solo la palabra, a través de tu servidor, y se guarda en caché); la corrección gramatical usa LanguageTool (se envía el texto de «Mi turno»). Sin conexión funcionan las palabras ya consultadas, tu vocabulario y reglas básicas de gramática.
+
 ## Interfaz
 Sistema visual propio ("cabina de estudio de audio"): tinta y papel frío con cobalto y una señal caléndula, modo oscuro automático, tipografías alojadas en `fonts/` (Bricolage Grotesque + Instrument Sans) para que funcionen sin conexión. Las barras de ecualizador del logo se animan cuando la app habla o te escucha. Cinco pestañas en móvil (barra lateral en escritorio), iconos SVG (sin emojis), objetivos táctiles de 44 px, foco visible y respeto de "reducir movimiento".
 

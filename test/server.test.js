@@ -4,7 +4,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 process.env.APP_PASSWORD = 'clave-de-prueba-123';
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ie-'));
 const { merge } = require('../merge.js');
-const { server, parseFeed, privateIp } = require('../server/server.js');
+const { server, parseFeed, privateIp, setOutFetch } = require('../server/server.js');
 let base, cookie = '';
 const api = (p, o = {}) => fetch(base + p, { redirect: 'manual', ...o, headers: { 'content-type': 'application/json', cookie, ...(o.headers || {}) } });
 test.before(() => new Promise(r => server.listen(0, () => { base = 'http://127.0.0.1:' + server.address().port; r(); })));
@@ -59,4 +59,46 @@ test('merge es conmutativo e idempotente', () => {
   assert.deepEqual(merge(a, b), merge(b, a));
   const m = merge(a, b); assert.deepEqual(merge(m, m), m);
   assert.equal(m.pods[0].del, true); assert.equal(m.pods[0].pos, 5); assert.equal(m.exams.length, 2);
+});
+
+test('diccionario: define con traducción, usa caché y valida la palabra', async () => {
+  let calls = 0;
+  setOutFetch(async url => {
+    calls++;
+    const j = o => new Response(JSON.stringify(o), { status: 200 });
+    if (url.includes('dictionaryapi.dev')) return j([{ word: 'neighbour', phonetic: '/ˈneɪ.bə/', meanings: [{ partOfSpeech: 'noun', definitions: [{ definition: 'A person living next door.', example: 'My neighbour is kind.' }] }] }]);
+    if (url.includes('mymemory')) return j({ responseData: { translatedText: 'vecino' }, matches: [{ translation: 'vecino' }, { translation: 'vecina' }] });
+    return new Response('x', { status: 404 });
+  });
+  const r = await (await api('/api/define?word=neighbour')).json();
+  assert.equal(r.found, true); assert.equal(r.meanings[0].defs[0].d, 'A person living next door.'); assert.deepEqual(r.es, ['vecino', 'vecina']);
+  const before = calls; await (await api('/api/define?word=neighbour')).json(); assert.equal(calls, before, 'segunda consulta sale de caché');
+  const es = await (await api('/api/define?word=vecino&from=es')).json(); assert.equal(es.from, 'es');
+  assert.equal((await api('/api/define?word=' + encodeURIComponent('a;rm -rf'))).status, 400);
+  assert.equal((await api('/api/define?word=')).status, 400);
+});
+test('gramática: valida entrada y mapea resultados', async () => {
+  setOutFetch(async (url, o) => { assert.match(String(o.body), /language=en-US/); return new Response(JSON.stringify({ matches: [{ offset: 0, length: 3, message: 'Possible agreement error', replacements: [{ value: 'She' }], rule: { id: 'HE_VERB_AGR' } }] }), { status: 200 }); });
+  const r = await (await api('/api/grammar', { method: 'POST', body: JSON.stringify({ text: 'He go home' }) })).json();
+  assert.equal(r.matches[0].replacements[0], 'She'); assert.equal(r.matches[0].rule, 'HE_VERB_AGR');
+  assert.equal((await api('/api/grammar', { method: 'POST', body: JSON.stringify({ text: '' }) })).status, 400);
+  assert.equal((await api('/api/grammar', { method: 'POST', body: JSON.stringify({ text: 'x'.repeat(3001) }) })).status, 400);
+});
+test('servicios externos exigen sesión y los archivos del OCR se sirven solo con sesión', async () => {
+  const saved = cookie; cookie = '';
+  assert.equal((await api('/api/define?word=hello')).status, 401);
+  assert.equal((await api('/api/grammar', { method: 'POST', body: '{"text":"hi"}' })).status, 401);
+  assert.equal((await api('/vendor/tesseract/worker.min.js')).status, 401);
+  cookie = saved;
+  const w = await api('/vendor/tesseract/worker.min.js'); assert.equal(w.status, 200);
+  const g = await api('/vendor/tesseract/lang/eng.traineddata.gz'); assert.equal(g.status, 200); assert.equal(g.headers.get('content-type'), 'application/gzip');
+  assert.equal((await api('/vendor/tesseract/..%2f..%2fserver%2fserver.js')).status, 404);
+  assert.match((await api('/index.html')).headers.get('content-security-policy'), /wasm-unsafe-eval/);
+});
+
+test('merge: lecturas se unen, respetan borrado y conservan el mejor puntaje', () => {
+  const a = { reads: [{ id: 'r1', title: 'A', text: 'old', t: 1, best: 70 }] };
+  const b = { reads: [{ id: 'r1', title: 'B', text: 'new text', t: 5, best: 40, del: true }, { id: 'r2', title: 'C', text: 'x y z', t: 2, best: 0 }] };
+  const m = merge(a, b); assert.deepEqual(m, merge(b, a));
+  const r1 = m.reads.find(r => r.id === 'r1'); assert.equal(r1.text, 'new text'); assert.equal(r1.best, 70); assert.equal(r1.del, true); assert.equal(m.reads.length, 2);
 });

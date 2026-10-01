@@ -35,6 +35,16 @@
       pods.set(p.id, { ...q, del: !!(q.del || p.del), pos: Math.max(num(q.pos), num(p.pos)), notes: notes.notes, nt: Math.max(num(q.nt), num(p.nt)) });
     }
     out.pods = [...pods.values()];
+    // lecturas guardadas: unión por id; gana el texto más reciente; mejor puntaje; tombstone `del`
+    const rd = new Map();
+    for (const r of [...(a.reads || []), ...(b.reads || [])]) {
+      if (!r || !r.id) continue;
+      const q = rd.get(r.id);
+      if (!q) { rd.set(r.id, { ...r }); continue; }
+      const newer = num(r.t) > num(q.t) ? r : q;
+      rd.set(r.id, { ...q, ...newer, del: !!(q.del || r.del), best: Math.max(num(q.best), num(r.best)), t: Math.max(num(q.t), num(r.t)) });
+    }
+    out.reads = [...rd.values()];
     // estadísticas: máximo por día
     out.stats = { days: {} };
     for (const d of new Set([...Object.keys(obj(obj(a.stats).days)), ...Object.keys(obj(obj(b.stats).days))]))

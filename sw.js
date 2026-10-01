@@ -1,5 +1,5 @@
-const V = 'ie-v5';
-const FILES = ['./index.html', 'style.css', 'app.js', 'merge.js', 'judge.js', 'manifest.json', 'icons/icon.svg', 'fonts/BricolageGrotesque.woff2', 'fonts/InstrumentSans.woff2', 'data/vocab.json', 'data/grammar.json', 'data/convo.json', 'data/levels.json'];
+const V = 'ie-v7';
+const FILES = ['./index.html', 'style.css', 'app.js', 'merge.js', 'judge.js', 'readlib.js', 'reader.js', 'manifest.json', 'icons/icon.svg', 'fonts/BricolageGrotesque.woff2', 'fonts/InstrumentSans.woff2', 'data/vocab.json', 'data/grammar.json', 'data/convo.json', 'data/levels.json'];
 // Instalación tolerante: sin sesión el servidor responde 401 y simplemente se cachea después de entrar.
 const put = c => f => fetch(f, { redirect: 'manual' }).then(r => r.ok ? c.put(f, r).then(() => r) : null).catch(() => null);
 self.addEventListener('install', e => e.waitUntil(caches.open(V).then(async c => {
